@@ -17,6 +17,8 @@
 
 ## 1. 整体架构
 
+![040bc7968c76e3c0fbad31785545f9bb](https://azusa-img-1348009459.cos.ap-beijing.myqcloud.com/LoRAMoE.png)
+
 ### 1.1 三层设计
 
 ```
@@ -39,11 +41,13 @@
 
 ### 1.2 核心公式
 
-$$output = Wx + \underbrace{\sum_{k \in \text{top-K}} g_k \cdot (B_k \cdot A_k \cdot x)}_{\text{MoE-LoRA 分支}} \cdot \frac{\alpha}{r}$$
+$$
+\text{output} = Wx + \underbrace{\sum_{k \in \text{top-K}} g_k \cdot (B_k \cdot A_k \cdot x)}_{\text{MoE-LoRA 分支}} \cdot \frac{\alpha}{r}
+$$
 
 其中：
-- $W \in \mathbb{R}^{d_{out} \times d_{in}}$ — 冻结的预训练权重
-- $A_k \in \mathbb{R}^{r \times d_{in}}, B_k \in \mathbb{R}^{d_{out} \times r}$ — 第 $k$ 个专家的低秩矩阵
+- $W \in \mathbb{R}^{d_{\text{out}} \times d_{\text{in}}}$ — 冻结的预训练权重
+- $A_k \in \mathbb{R}^{r \times d_{\text{in}}}, B_k \in \mathbb{R}^{d_{\text{out}} \times r}$ — 第 $k$ 个专家的低秩矩阵
 - $g_k$ — 路由器给第 $k$ 个专家的软权重
 - $\alpha / r$ — LoRA 缩放因子，默认 $\alpha=32, r=16 \Rightarrow$ 缩放 = 2.0
 
@@ -108,7 +112,7 @@ hidden_states (B, S, hidden_dim)
 | `hidden_dim` | `int` | 必填 | 输入隐藏维度 |
 | `num_experts` | `int` | 必填 | 专家总数 $E$ |
 | `top_k` | `int` | 2 | 每个 token 激活的专家数 |
-| `router_hidden_dim` | `int \| None` | None | None=单层 Linear，非None=两层MLP |
+| `router_hidden_dim` | `int \| None` | `None` | `None`=单层 Linear，非 `None`=两层 MLP |
 | `use_noisy_router` | `bool` | True | 训练时是否注入探索噪声 |
 | `noise_epsilon` | `float` | 1e-2 | 噪声平滑系数 |
 | `init_scale` | `float` | 0.02 | 权重初始化标准差 |
@@ -142,7 +146,9 @@ hidden_states (B, S, hidden_dim)
 
 **噪声注入公式**：
 
-$$\text{noisy\_logits} = \text{logits} + \mathcal{N}(0,1) \cdot \text{softplus}(\text{noise\_logits})$$
+$$
+\text{noisy\_logits} = \text{logits} + \mathcal{N}(0,1) \cdot \text{softplus}(\text{noise\_logits})
+$$
 
 借鉴自 Shazeer et al. (2017) 的 Noisy Top-k Gating。训练时通过噪声鼓励路由器探索不同的专家组合，防止过早坍缩到少数专家。推理时不注入噪声。
 
@@ -150,19 +156,23 @@ $$\text{noisy\_logits} = \text{logits} + \mathcal{N}(0,1) \cdot \text{softplus}(
 
 MoE 训练中最关键的辅助损失，防止所有 token 涌向同一个专家：
 
-$$\text{loss}_{\text{lb}} = E \cdot \sum_{i=1}^{E} f_i \cdot P_i$$
+$$
+\mathcal{L}_{\text{lb}} = E \cdot \sum_{i=1}^{E} f_i \cdot P_i
+$$
 
 **Router Z-loss**（稳定训练用）：
 
-$$\text{loss}_z = \frac{1}{T} \sum \text{logits}^2$$
+$$
+\mathcal{L}_{z} = \frac{1}{T} \sum \bigl( \text{logits} \bigr)^2
+$$
 
 | 符号 | 含义 |
 |------|------|
 | $E$ | 专家总数 |
 | $f_i$ | 实际分配给专家 $i$ 的 token 比例（从 `expert_indices` 统计） |
 | $P_i$ | 路由器 softmax 概率中专家 $i$ 的平均值 |
-| $\text{loss}_{\text{lb}}$ | 理想最小值为 1.0（$f_i = P_i = 1/E$） |
-| $\text{loss}_z$ | 惩罚过大的 logits 值 |
+| $\mathcal{L}_{\text{lb}}$ | 理想最小值为 1.0（$f_i = P_i = 1/E$） |
+| $\mathcal{L}_{z}$ | 惩罚过大的 logits 值 |
 
 ---
 
@@ -176,17 +186,19 @@ $$\text{loss}_z = \frac{1}{T} \sum \text{logits}^2$$
 
 | 参数 | 形状 | 可训练 | 说明 |
 |------|------|--------|------|
-| `base_linear.weight` | $(d_{out}, d_{in})$ | ❌ 冻结 | 原始预训练权重 |
-| `A_experts` | $(K, r, d_{in})$ | ✅ | 每个专家的下投影矩阵 |
-| `B_experts` | $(K, d_{out}, r)$ | ✅ | 每个专家的上投影矩阵 |
+| `base_linear.weight` | $(d_{\text{out}}, d_{\text{in}})$ | ❌ 冻结 | 原始预训练权重 |
+| `A_experts` | $(K, r, d_{\text{in}})$ | ✅ | 每个专家的下投影矩阵 |
+| `B_experts` | $(K, d_{\text{out}}, r)$ | ✅ | 每个专家的上投影矩阵 |
 | `router.router` | 依赖于配置 | ✅ | 门控网络权重 |
-| `bias` | $(d_{out},)$ | ✅ | 可选偏置 |
+| `bias` | $(d_{\text{out}},)$ | ✅ | 可选偏置 |
 
 **可训练参数量估算**：
 
-$$\text{params} = K \times r \times (d_{in} + d_{out}) + \text{router\_params}$$
+$$
+N_{\text{params}} = K \times r \times (d_{\text{in}} + d_{\text{out}}) + N_{\text{router}}
+$$
 
-对于 Qwen-7B 的 attention 层 ($d_{in}=d_{out}=4096, r=16, K=8$)：
+对于 Qwen-7B 的 attention 层 ($d_{\text{in}}=d_{\text{out}}=4096, r=16, K=8$)：
 - 每个 MoELoRA 层: $8 \times 16 \times (4096+4096) \approx 1.05M$ 参数
 - 对比原始全量微调参数量大幅降低
 
@@ -409,13 +421,15 @@ for batch in dataloader:
 
 ### 5.2 损失组成
 
-$$\text{total\_loss} = \text{LM\_loss} + \lambda_{\text{lb}} \cdot \text{loss}_{\text{lb}} + \lambda_z \cdot \text{loss}_z$$
+$$
+\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{LM}} + \lambda_{\text{lb}} \cdot \mathcal{L}_{\text{lb}} + \lambda_{z} \cdot \mathcal{L}_{z}
+$$
 
 | 损失项 | 含义 | 推荐权重 |
 |--------|------|----------|
-| `LM_loss` | 语言建模交叉熵损失 | 1.0 |
-| `loss_lb` | 负载均衡损失 | 0.01 |
-| `loss_z` | Router Z-loss | 0.001 |
+| $\mathcal{L}_{\text{LM}}$ | 语言建模交叉熵损失 | $1.0$ |
+| $\mathcal{L}_{\text{lb}}$ | 负载均衡损失 | $0.01$ |
+| $\mathcal{L}_{z}$ | Router Z-loss | $0.001$ |
 
 ---
 
