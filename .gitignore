@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+.env/
+
+# Model checkpoints
+qwen-moe-lora/
+checkpoint-*/
+*.bin
+*.safetensors
+pytorch_model*.bin
+
+# IDE
+.idea/
+.vscode/
+
+# Misc
+.DS_Store
+*.log
+wandb/
