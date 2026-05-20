@@ -30,26 +30,8 @@ Qwen/
 
 ## 架构概览
 
-```
-Input (batch, seq_len, d_in)
-    │
-    ├──► Base Linear (frozen) ──────────────────────┐
-    │                                                │
-    ├──► Router (Gating Network) ──► Top-K 稀疏激活   │
-    │         │                                      │
-    │    ┌────┴────┬─────────┐                       │
-    │    ▼         ▼         ▼                       │
-    │  Expert₀  Expert₁  ... Expertₖ₋₁              │
-    │  B₀@A₀@x  B₁@A₁@x     Bₖ₋₁@Aₖ₋₁@x            │
-    │    │         │         │                       │
-    │    └────┬────┴────┬────┘                       │
-    │         ▼                                      │
-    │    Σ( g_k · B_k @ A_k @ x ) · (α/r) ──────────┤
-    │                                                │
-    └────────────────────────────────────────────────┼──► Output
-                                                     │
-                                              base + MoE-LoRA
-```
+![](https://azusa-img-1348009459.cos.ap-beijing.myqcloud.com/LoRAMoE.png)
+
 
 ### 核心组件
 
