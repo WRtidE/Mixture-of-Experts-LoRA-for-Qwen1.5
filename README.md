@@ -69,7 +69,7 @@ pip install -r requirements.txt
 pip install matplotlib seaborn   # 可视化依赖
 ```
 
-### 2. 快速验证（单组小实验，约15分钟）
+### 2. 快速验证
 
 ```bash
 python scripts/train.py \
@@ -189,4 +189,3 @@ $$\mathcal{L}_{total} = \mathcal{L}_{LM} + \alpha \cdot \mathcal{L}_{balance} + 
 - [Switch Transformers](https://arxiv.org/abs/2101.03961)
 - [MoE-LoRA (arxiv)](https://arxiv.org/abs/2404.11590)
 - [Qwen1.5](https://huggingface.co/Qwen)
-# Mixture-of-Experts-LoRA-for-Qwen1.5
